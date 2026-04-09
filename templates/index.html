@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Crop Yield Predictor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300..700;1,300..400&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:        #f5f4f0;
+  --surface:   #faf9f7;
+  --surface2:  #f0ede8;
+  --border:    #e2ddd7;
+  --text:      #1e1c19;
+  --muted:     #7a766f;
+  --faint:     #c4bfb8;
+  --primary:   #3d6b4f;
+  --primary-bg:#eaf1ec;
+  --accent:    #b07d3e;
+  --radius:    10px;
+  --font-body: 'DM Sans', sans-serif;
+  --font-display: 'DM Serif Display', serif;
+  --ease: 180ms cubic-bezier(0.16,1,0.3,1);
+}
+*,*::before,*::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { -webkit-font-smoothing: antialiased; }
+body { font-family: var(--font-body); background: var(--bg); color: var(--text); min-height: 100dvh; font-size: 16px; line-height: 1.6; }
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; background: none; border: none; }
+
+.wrap { max-width: 680px; margin-inline: auto; padding: 3rem 1.5rem 4rem; }
+
+/* Header */
+.site-header { margin-bottom: 3rem; }
+.site-header h1 { font-family: var(--font-display); font-size: clamp(1.6rem, 4vw, 2.2rem); font-weight: 400; color: var(--text); line-height: 1.2; }
+.site-header p { font-size: 0.9rem; color: var(--muted); margin-top: 0.4rem; }
+
+/* Form */
+.form-section { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.75rem; }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.1rem; }
+.form-group { display: flex; flex-direction: column; gap: 0.35rem; }
+.form-group.full { grid-column: 1 / -1; }
+label { font-size: 0.78rem; font-weight: 500; color: var(--muted); letter-spacing: 0.03em; }
+input, select {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 0.6rem 0.8rem;
+  font-size: 0.95rem;
+  color: var(--text);
+  transition: border-color var(--ease), box-shadow var(--ease);
+  width: 100%;
+  appearance: auto;
+}
+input:focus, select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(61,107,79,0.1);
+}
+input::placeholder { color: var(--faint); }
+
+.btn {
+  margin-top: 1.25rem;
+  width: 100%;
+  padding: 0.75rem;
+  background: var(--primary);
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 500;
+  border-radius: 7px;
+  letter-spacing: 0.02em;
+  transition: background var(--ease), transform var(--ease);
+}
+.btn:hover { background: #2f5440; transform: translateY(-1px); }
+.btn:active { transform: none; }
+.btn:disabled { background: var(--faint); cursor: not-allowed; transform: none; }
+
+/* Divider */
+.divider { height: 1px; background: var(--border); margin: 2rem 0; }
+
+/* Result */
+.result { display: none; }
+.result.visible { display: block; }
+
+.yield-display { display: flex; align-items: baseline; gap: 0.5rem; margin-bottom: 0.3rem; }
+.yield-number { font-family: var(--font-display); font-size: clamp(2.2rem, 6vw, 3rem); color: var(--primary); line-height: 1; }
+.yield-unit { font-size: 0.85rem; color: var(--muted); }
+
+.yield-tag { display: inline-block; font-size: 0.75rem; font-weight: 500; padding: 0.2rem 0.65rem; border-radius: 99px; margin-bottom: 1.25rem; }
+.yield-tag.high   { background: #e4f0e8; color: #2f6645; }
+.yield-tag.avg    { background: #fdf3e3; color: #9a6520; }
+.yield-tag.low    { background: #fdecea; color: #a03030; }
+
+.conversions { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem; margin-bottom: 1.5rem; }
+.conv-box { background: var(--surface2); border-radius: 8px; padding: 0.9rem 1rem; }
+.conv-val { font-size: 1.1rem; font-weight: 600; color: var(--text); }
+.conv-lbl { font-size: 0.75rem; color: var(--muted); margin-top: 0.15rem; }
+
+/* SHAP bars */
+.analysis-title { font-size: 0.78rem; font-weight: 500; color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 0.85rem; }
+.shap-list { display: flex; flex-direction: column; gap: 0.55rem; margin-bottom: 1.5rem; }
+.shap-row { display: grid; grid-template-columns: 110px 1fr 38px; align-items: center; gap: 0.65rem; }
+.shap-lbl { font-size: 0.82rem; color: var(--muted); text-align: right; }
+.shap-track { height: 5px; background: var(--surface2); border-radius: 99px; overflow: hidden; }
+.shap-bar { height: 100%; background: var(--primary); border-radius: 99px; width: 0; transition: width 0.6s cubic-bezier(0.16,1,0.3,1); }
+.shap-pct { font-size: 0.75rem; color: var(--faint); text-align: right; }
+
+/* Improvement tips */
+.tips { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.tips-header { padding: 0.85rem 1rem; background: var(--surface); border-bottom: 1px solid var(--border); font-size: 0.82rem; font-weight: 500; color: var(--muted); }
+.tip-row { display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.85rem 1rem; border-bottom: 1px solid var(--border); }
+.tip-row:last-child { border-bottom: none; }
+.tip-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); margin-top: 0.45rem; flex-shrink: 0; }
+.tip-text { font-size: 0.85rem; color: var(--text); line-height: 1.5; }
+.tip-text strong { color: var(--primary); font-weight: 600; }
+.tip-metric { display: inline-block; font-size: 0.72rem; background: var(--primary-bg); color: var(--primary); padding: 1px 7px; border-radius: 99px; margin-left: 4px; font-weight: 500; }
+
+/* Loading */
+.loader { display: none; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: var(--muted); padding: 0.5rem 0; }
+.loader.visible { display: flex; }
+.spin { width: 14px; height: 14px; border: 1.5px solid var(--faint); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Error */
+.err { display: none; font-size: 0.83rem; color: #a03030; background: #fdecea; border-radius: 7px; padding: 0.65rem 0.85rem; margin-top: 0.75rem; }
+.err.visible { display: block; }
+
+footer { margin-top: 3rem; font-size: 0.75rem; color: var(--faint); text-align: center; }
+
+@media (max-width: 520px) {
+  .form-grid { grid-template-columns: 1fr; }
+  .conversions { grid-template-columns: 1fr; }
+  .shap-row { grid-template-columns: 90px 1fr 34px; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="site-header">
+    <h1>Crop Yield Predictor</h1>
+    <p>Enter growing conditions to estimate crop yield.</p>
+  </header>
+
+  <div class="form-section">
+    <form id="form">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Crop</label>
+          <select id="crop" required><option value="">Select...</option></select>
+        </div>
+        <div class="form-group">
+          <label>Country</label>
+          <select id="area" required><option value="">Select...</option></select>
+        </div>
+        <div class="form-group">
+          <label>Temperature (°C)</label>
+          <input type="number" id="temp" placeholder="e.g. 25" step="0.1" required>
+        </div>
+        <div class="form-group">
+          <label>Annual Rainfall (mm)</label>
+          <input type="number" id="rain" placeholder="e.g. 1200" step="10" required>
+        </div>
+        <div class="form-group">
+          <label>Pesticides (tonnes)</label>
+          <input type="number" id="pest" placeholder="e.g. 500" step="10" required>
+        </div>
+        <div class="form-group">
+          <label>Year</label>
+          <input type="number" id="year" value="2024" min="1990" max="2030" required>
+        </div>
+      </div>
+      <button type="submit" class="btn" id="btn">Predict yield</button>
+    </form>
+    <div class="err" id="err"></div>
+    <div class="loader" id="loader"><div class="spin"></div> Calculating…</div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="result" id="result">
+
+    <div class="yield-display">
+      <span class="yield-number" id="yNum">—</span>
+      <span class="yield-unit">hg / ha</span>
+    </div>
+    <div id="yTag"></div>
+
+    <div class="conversions">
+      <div class="conv-box">
+        <div class="conv-val" id="cTonnes">—</div>
+        <div class="conv-lbl">Tonnes per hectare</div>
+      </div>
+      <div class="conv-box">
+        <div class="conv-val" id="cKg">—</div>
+        <div class="conv-lbl">kg per 100 sq metres</div>
+      </div>
+    </div>
+
+    <p class="analysis-title">What influenced this prediction</p>
+    <div class="shap-list">
+      <div class="shap-row"><span class="shap-lbl">Crop type</span><div class="shap-track"><div class="shap-bar" data-w="100"></div></div><span class="shap-pct">100%</span></div>
+      <div class="shap-row"><span class="shap-lbl">Pesticides</span><div class="shap-track"><div class="shap-bar" data-w="18"></div></div><span class="shap-pct">18%</span></div>
+      <div class="shap-row"><span class="shap-lbl">Temperature</span><div class="shap-track"><div class="shap-bar" data-w="15"></div></div><span class="shap-pct">15%</span></div>
+      <div class="shap-row"><span class="shap-lbl">Country</span><div class="shap-track"><div class="shap-bar" data-w="11"></div></div><span class="shap-pct">11%</span></div>
+      <div class="shap-row"><span class="shap-lbl">Rainfall</span><div class="shap-track"><div class="shap-bar" data-w="11"></div></div><span class="shap-pct">11%</span></div>
+    </div>
+
+    <div class="tips">
+      <div class="tips-header">What could improve yield further</div>
+      <div class="tip-row">
+        <div class="tip-dot"></div>
+        <div class="tip-text">
+          Optimising <strong>pesticide application</strong> has the second-highest impact on yield after crop selection. Even moderate increases correlate with measurable gains.
+          <span class="tip-metric">↑ pesticides_tonnes</span>
+        </div>
+      </div>
+      <div class="tip-row">
+        <div class="tip-dot"></div>
+        <div class="tip-text">
+          <strong>Temperature</strong> has a non-linear relationship — yields peak at crop-specific optimal ranges. Deviation above or below these ranges reduces output.
+          <span class="tip-metric">avg_temp</span>
+        </div>
+      </div>
+      <div class="tip-row">
+        <div class="tip-dot"></div>
+        <div class="tip-text">
+          <strong>Rainfall</strong> and temperature together form a climate interaction. Crops in higher rainfall regions with moderate temperatures show consistently higher yields.
+          <span class="tip-metric">rainfall × temp</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+  </div>
+
+  <footer>Trained on FAO dataset · Random Forest · R² 0.9832</footer>
+</div>
+
+<script>
+async function loadOptions() {
+  try {
+    const r = await fetch("/valid-options");
+    const d = await r.json();
+    const cs = document.getElementById("crop");
+    const as = document.getElementById("area");
+    cs.innerHTML = '<option value="">Select...</option>' + d.items.map(i=>`<option value="${i}">${i}</option>`).join('');
+    as.innerHTML = '<option value="">Select...</option>' + d.areas.map(a=>`<option value="${a}">${a}</option>`).join('');
+  } catch(e) {}
+}
+loadOptions();
+
+const baseYield = {"Rice, paddy":45000,"Wheat":32000,"Maize":45000,"Potatoes":200000,"Soybeans":28000,"Sorghum":15000,"Cassava":120000,"Sweet potatoes":100000,"Yams":90000};
+
+document.getElementById("form").addEventListener("submit", async function(e) {
+  e.preventDefault();
+  const btn = document.getElementById("btn");
+  const loader = document.getElementById("loader");
+  const result = document.getElementById("result");
+  const errEl = document.getElementById("err");
+
+  btn.disabled = true;
+  loader.classList.add("visible");
+  result.classList.remove("visible");
+  errEl.classList.remove("visible");
+
+  try {
+    const res = await fetch("/predict", {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({
+        crop: document.getElementById("crop").value,
+        area: document.getElementById("area").value,
+        temp: document.getElementById("temp").value,
+        rainfall: document.getElementById("rain").value,
+        pesticides: document.getElementById("pest").value,
+        year: document.getElementById("year").value
+      })
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+
+    const y = data.yield_hgha;
+    document.getElementById("yNum").textContent = y.toLocaleString();
+    document.getElementById("cTonnes").textContent = data.yield_tonnes;
+    document.getElementById("cKg").textContent = data.yield_kg_100sqm;
+
+    const crop = document.getElementById("crop").value;
+    const base = baseYield[crop] || 40000;
+    const ratio = y / base;
+    const tagEl = document.getElementById("yTag");
+    if (ratio >= 1.15)      tagEl.innerHTML = '<span class="yield-tag high">Above average</span>';
+    else if (ratio >= 0.82) tagEl.innerHTML = '<span class="yield-tag avg">Average yield</span>';
+    else                     tagEl.innerHTML = '<span class="yield-tag low">Below average</span>';
+
+    result.classList.add("visible");
+    setTimeout(() => {
+      document.querySelectorAll(".shap-bar").forEach(b => {
+        b.style.width = b.dataset.w + "%";
+      });
+    }, 60);
+
+  } catch(err) {
+    errEl.textContent = err.message;
+    errEl.classList.add("visible");
+  } finally {
+    loader.classList.remove("visible");
+    btn.disabled = false;
+  }
+});
+</script>
+</body>
+</html>
